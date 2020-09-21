@@ -29,7 +29,7 @@ SWEP.Secondary.ClipSize     = -1
 SWEP.Secondary.DefaultClip  = -1
 SWEP.Secondary.Automatic    = true
 SWEP.Secondary.Ammo         = "none"
-SWEP.Secondary.Delay        = 0.1
+SWEP.Secondary.Delay        = 0.3
 
 SWEP.Kind                   = WEAPON_CARRY
 SWEP.InLoadoutFor           = {ROLE_INNOCENT, ROLE_TRAITOR, ROLE_DETECTIVE}
@@ -57,10 +57,25 @@ CARRY_WEIGHT_LIMIT = 45
 
 local PIN_RAG_RANGE = 90
 
+function SWEP:Initialize()
+	self.bActive = false
+end
 function SWEP:PrimaryAttack()
 end
 
 function SWEP:SecondaryAttack()
+	if not self:CanSecondaryAttack() then return end
+	if self.bActive then
+		self:SetNextPrimaryFire(CurTime() + SWEP.Primary.Delay )
+		self:SetNextSecondaryAttack(CurTime() + SWEP.Secondary.Delay )
+		self:DetachObject()
+		self:SendWeaponAnim( ACT_VM_MISSCENTER )
+	else
+		self:FindObject()
+	end
+end
+
+function SWEP:FindObject()
 	--This whole function was written to mirrror weapon_physcannon.cpp
 	local trData = {
 		start = self:GetPos(),
@@ -98,12 +113,9 @@ function SWEP:SecondaryAttack()
 			bPull = true
 		end
 	end
-	if not self:CanPickup(ent) then
-		--play an anim or something probably
-		return
-	end
-	if bAttach then
+	if bAttach and self:CanPickup(ent) then
 		self:Attach(ent)
+		self.bActive = true
 		return
 	end
 	local phys = ent:GetPhysicsObject()
@@ -130,19 +142,6 @@ function SWEP:CanPickup(target)
 			(target.CanPickup ~= false) and
 			(target:GetClass() ~= "prop_ragdoll" or allow_rag:GetBool()) and
 			((not target:IsWeapon()) or allow_wep:GetBool())
-end
-
-function SWEP:Attach(ent)
-	local phys = ent:GetPhysicsObject()
-	if self.attached or not self:CanPickup(ent) or not IsValid(phys) then
-		return
-	end
-	if not self.handler then
-		self.handler = ents.Create("ttt_carry_handler")
-		if not self.handler then return end
-	end
-	self.attached = ent
-	self.handler:AddToMotionController(phys)
 end
 
 function SWEP:Drop()

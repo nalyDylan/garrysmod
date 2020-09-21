@@ -1,4 +1,6 @@
-
+--[[
+The goal here is to replicate the CGrabController code in weapon_physcannon.cpp
+]]
 AddCSLuaFile()
 
 ENT.Type = "anim"
@@ -10,13 +12,85 @@ ENT.TargetPos = Vector(0,0,0)
 ENT.TargetAng = Angle(0,0,0)
 ENT.Owner = nil
 
+
+local REDUCED_CARRY_MASS = 1
+
+function ENT:OnRemove()
+   self:DetachEntity(false)
+end
+
+function ENT:SetTargetPosition(target, targetOrientation)
+   self.targetPosition = target
+   self.targetRotation = targetOrientation
+
+   --this is defined but not used in weapon_physcannon here
+   --[[
+      TODO: Is this important here? Should it be somewhere else?
+      Should it be deleted?
+   ]]
+   local timeToArrive = FrameTime()
+
+   --[[
+   TODO: There's a bunch of code here in weapon_physcannon that wakes a single attachment
+   of the GrabController, I'm not sure we need that?
+   ]]
+end
+
+function ENT:Attach(ent)
+   local phys = ent:GetPhysicsObject()
+   if self.attached or not self:CanPickup(ent) or not IsValid(phys) then
+      return
+   end
+   if not self.handler then
+      self.handler = ents.Create("ttt_carry_handler")
+      if not self.handler then return end
+   end
+   self.attached = ent
+   self.handler:AddToMotionController(phys)
+
+   phys:Wake()
+   phys:AddGameFlag(FVPHYSICS_PLAYER_HELD)
+   --[[
+   the below is in weapon_physcannon, but does it matter?
+   TODO: Put some sort of print statement here and test this on some TTT maps
+   I can't imagine too many TTT entities have lots of physobjects, and the documentation
+   says ragdolls only have one.
+
+   This code is here to stop crazy physics though
+   ]]
+   local count = ent:GetPhysicsObjectCount()
+   local loadweight = 0
+   local flFactor = math.max(count / 7.5, 1)
+   local obj
+   for i = 0,count do
+      obj = GetPhysicsObjectNum(i)
+      loadweight = loadweight + obj:GetMass()
+      table.insert(self.savedMass, obj:GetMass())
+      obj:SetMass(1 / flFactor)
+      obj:SetDamping(10)
+   end
+   phys:SetMass(1)
+   phys:EnableDrag(false)
+end
 function ENT:Initialize()
+   --[[
+   I can't take the name m_shadow seriously for these because I listen
+   to Avenged Sevenfold... so self will do.
+   presumably though this is for the PhysObject Shadow though.
+   Defining these here for now because they seem to change on the fly maybe?
+
+   TODO: Do these change?
+   ]]
+   self.dampFactor = 1
+   self.teleportDistance = 0
+   self.maxSpeed = 1000
+   self.maxAngular = 3600
+   self.maxDampSpeed = 2000
+   self.maxDampAngular = self.maxAngular
+   self.attachedEntity = nil
+   self.savedMass = {}
    if SERVER and IsValid(self.Carried) then
-      
---      self:SetModel("models/weapons/w_bugbait.mdl")
       self:SetModel(self.Carried:GetModel())
---      self:SetSkin(self.Carried:GetSkin())
---      self:SetColor(se.Carried:GetColor())
    end
    self:PhysicsInit( SOLID_VPHYSICS )
    self:SetMoveType( MOVETYPE_VPHYSICS )
